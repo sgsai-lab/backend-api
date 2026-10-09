@@ -45,6 +45,23 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
 
+      - name: Preflight - required configuration
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in GCP_PROJECT_ID GCP_REGION GCP_RUNTIME_SERVICE_ACCOUNT; do
+            if [[ -z "${!name}" ]]; then echo "::error::Variable $name is not set"; missing=1; fi
+          done
+          for secret in DATABASE_URL JWT_PRIVATE_KEY MFA_ENCRYPTION_KEY EMAIL_API_KEY GOOGLE_OAUTH_CLIENT_IDS; do
+            if ! gcloud secrets describe "$secret" --project "$GCP_PROJECT_ID" >/dev/null 2>&1; then
+              echo "::error::Secret Manager secret $secret not found in $GCP_PROJECT_ID"; missing=1
+            fi
+          done
+          if [[ -z "$CLOUD_SQL_INSTANCE" ]]; then
+            echo "::warning::CLOUD_SQL_INSTANCE not set; DATABASE_URL must reach Postgres without the Cloud SQL socket"
+          fi
+          exit "$missing"
+
       - name: Build and push image
         run: |
           set -euo pipefail

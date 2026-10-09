@@ -76,6 +76,11 @@ migrations up/down/up + pytest with coverage ≥ 80% (`test`), SonarQube Cloud q
 image scan (`build`). PR titles must follow Conventional Commits. Merges to `develop` deploy
 to Cloud Run via `.github/workflows/deploy-dev.yml` (Workload Identity Federation).
 
+## Branching and environments
+
+`feature/*` → PR into `develop` → auto-deploy to **development** (GitHub environment restricted
+to `develop`) → PR `develop` → `main` for release. Never PR features straight into `main`.
+
 ## Conventions
 
 - All business routes are versioned under `/api/v1`.
