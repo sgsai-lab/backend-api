@@ -123,18 +123,30 @@ async def remove_mfa(session: AsyncSession, user: User) -> None:
     user.mfa_enabled = False
 
 
+def _pending_secret(row: MfaTotp | None) -> str | None:
+    # An undecryptable pending secret (e.g. after MFA key rotation) is replaced, not fatal.
+    if row is None:
+        return None
+    try:
+        return decrypt_secret(row.secret_encrypted)
+    except ValueError:
+        return None
+
+
 async def setup_totp(session: AsyncSession, user: User) -> tuple[str, str]:
     if user.mfa_enabled:
         raise ConflictError(
             "Two-factor authentication is already enabled", code="MFA_ALREADY_ENABLED"
         )
     row = await session.get(MfaTotp, user.id)
-    if row is None:
+    secret = _pending_secret(row)
+    if secret is None:
         secret = pyotp.random_base32()
-        session.add(MfaTotp(user_id=user.id, secret_encrypted=encrypt_secret(secret)))
+        if row is None:
+            session.add(MfaTotp(user_id=user.id, secret_encrypted=encrypt_secret(secret)))
+        else:
+            row.secret_encrypted = encrypt_secret(secret)
         await session.commit()
-    else:
-        secret = decrypt_secret(row.secret_encrypted)
     uri = pyotp.TOTP(secret).provisioning_uri(
         name=user.email, issuer_name=get_settings().mfa_issuer
     )
