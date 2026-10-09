@@ -12,13 +12,17 @@ concurrency:
   group: deploy-development
   cancel-in-progress: false
 
-# Repository/environment variables (Settings → Environments → development):
-#   GCP_PROJECT_ID, GCP_REGION, GCP_WIF_PROVIDER, GCP_DEPLOY_SA, GCP_RUNTIME_SA,
-#   CLOUD_SQL_INSTANCE (project:region:instance), CORS_ALLOW_ORIGINS, FRONTEND_BASE_URL
+# Shared GCP variables (same names/values as sgsai-lab/home): GCP_PROJECT_ID, GCP_REGION,
+# GCP_ARTIFACT_REPOSITORY, GCP_WIF_PROVIDER, GCP_WIF_SERVICE_ACCOUNT, GCP_RUNTIME_SERVICE_ACCOUNT.
+# Backend-specific (optional): CLOUD_SQL_INSTANCE, FRONTEND_BASE_URL, CORS_ALLOW_ORIGINS.
 env:
   SERVICE: backend-api
   MIGRATE_JOB: backend-api-migrate
-  IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/backend/backend-api:${{ github.sha }}
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION }}
+  GCP_RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+  CLOUD_SQL_INSTANCE: ${{ vars.CLOUD_SQL_INSTANCE }}
+  IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}/backend-api:${{ github.sha }}
   SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,JWT_PRIVATE_KEY=JWT_PRIVATE_KEY:latest,MFA_ENCRYPTION_KEY=MFA_ENCRYPTION_KEY:latest,EMAIL_API_KEY=EMAIL_API_KEY:latest,GOOGLE_OAUTH_CLIENT_IDS=GOOGLE_OAUTH_CLIENT_IDS:latest
 
@@ -37,13 +41,14 @@ jobs:
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          service_account: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
 
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
 
       - name: Build and push image
         run: |
-          gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+          set -euo pipefail
+          gcloud auth configure-docker "$GCP_REGION-docker.pkg.dev" --quiet
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
@@ -57,33 +62,49 @@ jobs:
 
       - name: Run database migrations (Cloud Run Job)
         run: |
+          set -euo pipefail
+          sql_args=()
+          if [[ -n "$CLOUD_SQL_INSTANCE" ]]; then
+            sql_args+=(--set-cloudsql-instances "$CLOUD_SQL_INSTANCE")
+          fi
           gcloud run jobs deploy "$MIGRATE_JOB" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
             --image "$IMAGE" \
-            --region "${{ vars.GCP_REGION }}" \
-            --service-account "${{ vars.GCP_RUNTIME_SA }}" \
-            --set-cloudsql-instances "${{ vars.CLOUD_SQL_INSTANCE }}" \
+            --service-account "$GCP_RUNTIME_SERVICE_ACCOUNT" \
             --set-secrets "DATABASE_URL=DATABASE_URL:latest" \
             --set-env-vars "ENVIRONMENT=development,LOG_JSON=true" \
             --command alembic --args upgrade,head \
-            --max-retries 0 --task-timeout 300s
-          gcloud run jobs execute "$MIGRATE_JOB" --region "${{ vars.GCP_REGION }}" --wait
+            --max-retries 0 --task-timeout 300s \
+            "${sql_args[@]}"
+          gcloud run jobs execute "$MIGRATE_JOB" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --wait
 
       - name: Deploy service
+        env:
+          FRONTEND_BASE_URL: ${{ vars.FRONTEND_BASE_URL || 'https://sgsaitechnology.com' }}
+          CORS_ALLOW_ORIGINS: ${{ vars.CORS_ALLOW_ORIGINS || '["https://sgsaitechnology.com"]' }}
         run: |
+          set -euo pipefail
+          sql_args=()
+          if [[ -n "$CLOUD_SQL_INSTANCE" ]]; then
+            sql_args+=(--set-cloudsql-instances "$CLOUD_SQL_INSTANCE")
+          fi
           gcloud run deploy "$SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
             --image "$IMAGE" \
-            --region "${{ vars.GCP_REGION }}" \
-            --service-account "${{ vars.GCP_RUNTIME_SA }}" \
-            --set-cloudsql-instances "${{ vars.CLOUD_SQL_INSTANCE }}" \
+            --service-account "$GCP_RUNTIME_SERVICE_ACCOUNT" \
             --set-secrets "$SECRETS" \
-            --set-env-vars "^@^ENVIRONMENT=development@LOG_JSON=true@GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}@EMAIL_BACKEND=api@FRONTEND_BASE_URL=${{ vars.FRONTEND_BASE_URL }}@CORS_ALLOW_ORIGINS=${{ vars.CORS_ALLOW_ORIGINS }}" \
+            --set-env-vars "^@^ENVIRONMENT=development@LOG_JSON=true@GCP_PROJECT_ID=$GCP_PROJECT_ID@EMAIL_BACKEND=api@FRONTEND_BASE_URL=$FRONTEND_BASE_URL@CORS_ALLOW_ORIGINS=$CORS_ALLOW_ORIGINS" \
             --min-instances 0 --max-instances 3 \
             --memory 512Mi --cpu 1 --timeout 60s \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            "${sql_args[@]}"
 
       - name: Smoke test
         run: |
-          URL=$(gcloud run services describe "$SERVICE" --region "${{ vars.GCP_REGION }}" --format 'value(status.url)')
+          set -euo pipefail
+          URL=$(gcloud run services describe "$SERVICE" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format 'value(status.url)')
           curl -fsS --retry 5 --retry-delay 3 "$URL/healthz"
           curl -fsS --retry 5 --retry-delay 3 "$URL/readyz"
           echo "### Deployed \`${{ github.sha }}\` to $URL" >> "$GITHUB_STEP_SUMMARY"

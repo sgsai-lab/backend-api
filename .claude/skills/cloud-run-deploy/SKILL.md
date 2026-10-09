@@ -13,9 +13,11 @@ Normal path is CI (`develop` → development). Use manual commands only for debu
 | Item | Value |
 | --- | --- |
 | Service | `backend-api` |
-| Image | `${REGION}-docker.pkg.dev/${PROJECT}/backend/backend-api:<git-sha>` |
+| Project / region | `home-509818` / `asia-south1` (shared with `sgsai-lab/home`; repo variables `GCP_*`) |
+| Image | `${REGION}-docker.pkg.dev/${PROJECT}/sgsai-images/backend-api:<git-sha>` |
 | Migration job | `backend-api-migrate` (same image, `alembic upgrade head`) |
-| Runtime SA | `backend-api-run@${PROJECT}.iam.gserviceaccount.com` |
+| Deploy SA (WIF) | `sgsai-github-deploy@home-509818.iam.gserviceaccount.com` |
+| Runtime SA | `GCP_RUNTIME_SERVICE_ACCOUNT` (currently `sgs-ai-website-runtime@home-509818.iam.gserviceaccount.com`) |
 | Secrets | `DATABASE_URL`, `JWT_PRIVATE_KEY`, `MFA_ENCRYPTION_KEY`, `EMAIL_API_KEY`, `GOOGLE_OAUTH_CLIENT_IDS` |
 | Limits | `--max-instances 3 --min-instances 0 --memory 512Mi --timeout 60s`, `DB_POOL_SIZE=5` |
 
@@ -23,11 +25,12 @@ Normal path is CI (`develop` → development). Use manual commands only for debu
 
 ```bash
 SHA=$(git rev-parse HEAD)
-IMAGE=${REGION}-docker.pkg.dev/${PROJECT}/backend/backend-api:${SHA}
+PROJECT=home-509818 REGION=asia-south1
+IMAGE=${REGION}-docker.pkg.dev/${PROJECT}/sgsai-images/backend-api:${SHA}
 gcloud run jobs update backend-api-migrate --image "$IMAGE" --region "$REGION"
 gcloud run jobs execute backend-api-migrate --region "$REGION" --wait
 gcloud run deploy backend-api --image "$IMAGE" --region "$REGION" \
-  --service-account backend-api-run@${PROJECT}.iam.gserviceaccount.com \
+  --service-account sgs-ai-website-runtime@${PROJECT}.iam.gserviceaccount.com \
   --set-secrets DATABASE_URL=DATABASE_URL:latest,JWT_PRIVATE_KEY=JWT_PRIVATE_KEY:latest \
   --set-env-vars ENVIRONMENT=development,LOG_JSON=true
 curl -fsS "$(gcloud run services describe backend-api --region "$REGION" --format 'value(status.url)')/readyz"
