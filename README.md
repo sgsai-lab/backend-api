@@ -40,8 +40,14 @@ Create the first administrator: `make admin email=you@example.com` (prompts for 
 
 Auth model (ADR-001): ES256 access JWT (15 min) + opaque rotating refresh token (30 days,
 reuse detection). Web clients send `X-Client: web` and receive the refresh token in an
-`HttpOnly` `__Host-refresh` cookie instead of the response body. Admin endpoints require a
-session that completed MFA.
+`HttpOnly` `__Host-refresh` cookie instead of the response body.
+
+MFA feature flags (env vars; per-environment GitHub variables for deploys):
+
+| Flag | Default | Effect |
+| --- | --- | --- |
+| `MFA_ENABLED` | `true` | Users may enrol in TOTP MFA. When `false`, enrolment returns 403 `FEATURE_DISABLED`; users already enrolled are still challenged at login. |
+| `ADMIN_REQUIRE_MFA` | `false` | Admin endpoints require a session that completed MFA. Turn on before production. |
 
 ## Commands
 

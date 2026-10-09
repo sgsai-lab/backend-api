@@ -1,9 +1,11 @@
 from datetime import timedelta
 
+import pytest
 import time_machine
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.email import InMemoryEmailSender
 from app.modules.auth.models import MfaTotp
 from tests.integration.conftest import (
@@ -46,6 +48,20 @@ async def test_setup_returns_otpauth_uri_and_is_idempotent(
 
     assert first["otpauth_uri"].startswith("otpauth://totp/")
     assert first["secret"] == second["secret"]
+
+
+async def test_enrolment_is_blocked_when_mfa_feature_disabled(
+    client: AsyncClient, auth_headers: AuthHeaders, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "mfa_enabled", False)
+    headers = await auth_headers()
+
+    setup = await client.post(SETUP, headers=headers)
+    status = await client.get(MFA, headers=headers)
+
+    assert setup.status_code == 403
+    assert setup.json()["error"]["code"] == "FEATURE_DISABLED"
+    assert status.json()["available"] is False
 
 
 async def test_setup_replaces_undecryptable_pending_secret(
@@ -104,6 +120,7 @@ async def test_enable_mfa_then_login_requires_second_factor(
     assert outbox.outbox[-1].template == "mfa_enabled"
     assert len(codes) == 10
     assert status == {
+        "available": True,
         "enabled": True,
         "methods": ["totp", "recovery_code"],
         "recovery_codes_remaining": 10,

@@ -38,7 +38,9 @@ class Settings(BaseSettings):
 
     mfa_encryption_key: SecretStr | None = None
     mfa_issuer: str = "SGS AI"
-    admin_require_mfa: bool = True
+    # Feature flags: MFA is optional until production hardening.
+    mfa_enabled: bool = True
+    admin_require_mfa: bool = False
 
     google_oauth_client_ids: list[str] = []
 

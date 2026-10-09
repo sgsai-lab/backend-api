@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, Request, Response, status
 
+from app.core.config import get_settings
 from app.core.email import MailerDep
 from app.core.openapi import error_responses
 from app.core.rate_limit import rate_limit
 from app.db.session import DbSession
-from app.modules.auth.deps import Client, CurrentAuth, CurrentUser
+from app.modules.auth.deps import Client, CurrentAuth, CurrentUser, require_mfa_feature
 from app.modules.auth.responses import token_response
 from app.modules.auth.schemas import (
     MfaStatusResponse,
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/mfa")
 async def mfa_status(user: CurrentUser, session: DbSession) -> MfaStatusResponse:
     remaining = await mfa.remaining_recovery_codes(session, user) if user.mfa_enabled else 0
     return MfaStatusResponse(
+        available=get_settings().mfa_enabled,
         enabled=user.mfa_enabled,
         methods=["totp", "recovery_code"] if user.mfa_enabled else [],
         recovery_codes_remaining=remaining,
@@ -33,7 +35,8 @@ async def mfa_status(user: CurrentUser, session: DbSession) -> MfaStatusResponse
 @router.post(
     "/totp/setup",
     summary="Start TOTP enrolment (returns the secret and otpauth URI)",
-    responses=error_responses(401, 409),
+    responses=error_responses(401, 403, 409),
+    dependencies=[Depends(require_mfa_feature)],
 )
 async def setup_totp(user: CurrentUser, session: DbSession) -> TotpSetupResponse:
     secret, uri = await mfa.setup_totp(session, user)
@@ -43,8 +46,8 @@ async def setup_totp(user: CurrentUser, session: DbSession) -> TotpSetupResponse
 @router.post(
     "/totp/confirm",
     summary="Confirm TOTP enrolment and receive recovery codes (shown once)",
-    responses=error_responses(400, 401, 409, 422),
-    dependencies=[Depends(rate_limit("mfa-confirm", 10, 60))],
+    responses=error_responses(400, 401, 403, 409, 422),
+    dependencies=[Depends(require_mfa_feature), Depends(rate_limit("mfa-confirm", 10, 60))],
 )
 async def confirm_totp(
     payload: TotpCodeRequest, user: CurrentUser, session: DbSession, mailer: MailerDep
