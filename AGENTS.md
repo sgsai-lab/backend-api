@@ -26,6 +26,7 @@ app/core/        config (pydantic-settings), logging, errors (AppError + envelop
 app/db/          Base (naming convention), async engine/session (get_session)
 app/api/         health routes, /api/v1 router aggregating modules
 app/modules/<m>/ router.py · schemas.py · service.py · models.py · deps.py
+app/modules/auth/ routes/*.py + services/*.py (split by flow); deps.py has CurrentUser, AdminUser, VerifiedUser
 migrations/      Alembic (async env); import new models in migrations/env.py
 tests/unit/      no DB;  tests/integration/  real Postgres, marked `integration`
 ```

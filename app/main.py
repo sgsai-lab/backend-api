@@ -10,8 +10,9 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
-from app.core.middleware import request_context_middleware
+from app.core.middleware import BodySizeLimitMiddleware, request_context_middleware
 from app.db.session import get_engine
+from app.modules.auth.router import well_known_router
 
 log = structlog.get_logger(__name__)
 
@@ -45,12 +46,14 @@ def create_app() -> FastAPI:
             allow_origins=settings.cors_allow_origins,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-            allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+            allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Client"],
             expose_headers=["X-Request-ID"],
         )
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes)
 
     register_exception_handlers(app)
     app.include_router(health_router)
+    app.include_router(well_known_router)
     app.include_router(api_router)
     return app
 

@@ -1,4 +1,4 @@
-.PHONY: install dev lint format typecheck test check migrate revision up down image scan
+.PHONY: install dev lint format typecheck test cov audit check migrate revision up down image scan admin
 
 install:
 	uv sync
@@ -20,6 +20,12 @@ typecheck:
 test:
 	uv run pytest
 
+cov:
+	uv run pytest --cov --cov-report=term --cov-report=xml --cov-fail-under=80
+
+audit:
+	uv run pip-audit --strict
+
 check: lint typecheck test
 
 migrate:
@@ -39,3 +45,6 @@ image:
 
 scan: image
 	trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 sgsai-backend-api:local
+
+admin:
+	uv run python -m app.cli create-admin --email "$(email)"

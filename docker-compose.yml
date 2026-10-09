@@ -3,10 +3,24 @@ services:
     build: .
     ports:
       - "8080:8080"
-    environment:
+    environment: &api-env
       ENVIRONMENT: local
       LOG_JSON: "false"
       DATABASE_URL: postgresql+asyncpg://app:app@db:5432/app
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      FRONTEND_BASE_URL: http://localhost:3000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+
+  # One-shot: applies Alembic migrations before the API starts.
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment: *api-env
     depends_on:
       db:
         condition: service_healthy

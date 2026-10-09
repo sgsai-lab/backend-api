@@ -5,10 +5,17 @@ description = "SGS AI Technology backend API (FastAPI)"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "aiosmtplib>=5.1.3",
     "alembic>=1.20.0",
+    "argon2-cffi>=25.1.0",
     "asyncpg>=0.32.0",
     "fastapi>=0.143.0",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
     "pydantic-settings>=2.15.0",
+    "pydantic[email]>=2.14.0",
+    "pyjwt[crypto]>=2.15.1",
+    "pyotp>=2.10.0",
     "sqlalchemy[asyncio]>=2.1.4",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.54.0",
@@ -16,11 +23,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "mypy>=2.4.0",
+    "pip-audit>=2.10.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.10",
+    "time-machine>=3.5.1",
 ]
 
 [tool.uv]
@@ -32,7 +41,10 @@ line-length = 100
 extend-exclude = ["migrations/versions"]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "N", "UP", "B", "S", "ASYNC", "SIM", "RUF"]
+select = ["E", "W", "F", "I", "N", "UP", "B", "S", "ASYNC", "SIM", "RUF", "C90"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106"]
@@ -47,5 +59,17 @@ exclude = ["migrations/versions/"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 addopts = "-ra --strict-markers"
 markers = ["integration: requires a running Postgres"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+concurrency = ["greenlet", "thread"]
+omit = ["app/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
