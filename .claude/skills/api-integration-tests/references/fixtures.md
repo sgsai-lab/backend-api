@@ -30,8 +30,9 @@ async def connection() -> AsyncIterator[AsyncConnection]:
 async def session(connection: AsyncConnection) -> AsyncIterator[AsyncSession]:
     # Each test runs in an outer transaction that is rolled back; service commits become savepoints.
     trans = await connection.begin()
-    async with AsyncSession(bind=connection, join_transaction_mode="create_savepoint",
-                            expire_on_commit=False) as s:
+    async with AsyncSession(
+        bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
+    ) as s:
         yield s
     await trans.rollback()
 
@@ -52,19 +53,27 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
 @pytest.fixture
 def user_factory(session: AsyncSession) -> Callable[..., Awaitable[User]]:
     async def make(**kw: object) -> User:
-        user = User(email=f"{uuid.uuid4().hex[:8]}@example.test", full_name="Test User",
-                    email_verified_at=None, **kw)
+        user = User(
+            email=f"{uuid.uuid4().hex[:8]}@example.test",
+            full_name="Test User",
+            email_verified_at=None,
+            **kw,
+        )
         session.add(user)
         await session.flush()
         return user
+
     return make
 
 
 @pytest.fixture
-def auth_headers(user_factory: Callable[..., Awaitable[User]]) -> Callable[..., Awaitable[dict[str, str]]]:
+def auth_headers(
+    user_factory: Callable[..., Awaitable[User]],
+) -> Callable[..., Awaitable[dict[str, str]]]:
     async def make(user: User | None = None, **kw: object) -> dict[str, str]:
         user = user or await user_factory(**kw)
         return {"Authorization": f"Bearer {issue_access_token(user, amr=['pwd'])}"}
+
     return make
 ```
 

@@ -37,8 +37,13 @@ Downgrade cannot remove enum values easily — document it and make downgrade a 
 ```python
 def upgrade() -> None:
     with op.get_context().autocommit_block():
-        op.create_index("ix_products_project_id", "products", ["project_id"],
-                        postgresql_concurrently=True, if_not_exists=True)
+        op.create_index(
+            "ix_products_project_id",
+            "products",
+            ["project_id"],
+            postgresql_concurrently=True,
+            if_not_exists=True,
+        )
 ```
 
 ## Batched backfill
@@ -46,10 +51,12 @@ def upgrade() -> None:
 ```python
 conn = op.get_bind()
 while True:
-    result = conn.execute(sa.text(
-        "UPDATE users SET full_name = '' WHERE id IN "
-        "(SELECT id FROM users WHERE full_name IS NULL LIMIT 1000)"
-    ))
+    result = conn.execute(
+        sa.text(
+            "UPDATE users SET full_name = '' WHERE id IN "
+            "(SELECT id FROM users WHERE full_name IS NULL LIMIT 1000)"
+        )
+    )
     if result.rowcount == 0:
         break
 ```
