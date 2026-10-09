@@ -1,0 +1,4 @@
+[submodule "webapp"]
+	path = webapp
+	url = https://github.com/sgsai-lab/home.git
+	branch = develop
