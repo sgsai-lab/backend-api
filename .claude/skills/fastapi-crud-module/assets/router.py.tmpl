@@ -1,0 +1,77 @@
+import uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, Response, status
+
+from app.core.pagination import Page
+from app.modules.auth.deps import CurrentUser, DbSession
+from app.modules.widgets import service
+from app.modules.widgets.schemas import (
+    WidgetCreate,
+    WidgetFilters,
+    WidgetRead,
+    WidgetUpdate,
+)
+
+router = APIRouter(prefix="/widgets", tags=["widgets"])
+
+_ERRORS: dict[int | str, dict[str, str]] = {
+    401: {"description": "Missing or invalid access token"},
+    404: {"description": "Widget not found"},
+    422: {"description": "Validation error"},
+}
+
+
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a widget",
+    responses={**_ERRORS, 409: {"description": "Duplicate name"}},
+)
+async def create_widget(
+    payload: WidgetCreate, user: CurrentUser, session: DbSession, response: Response
+) -> WidgetRead:
+    widget = await service.create_widget(session, user, payload)
+    response.headers["Location"] = f"/api/v1/widgets/{widget.id}"
+    return WidgetRead.model_validate(widget)
+
+
+@router.get("", summary="List my widgets", responses=_ERRORS)
+async def list_widgets(
+    user: CurrentUser,
+    session: DbSession,
+    filters: Annotated[WidgetFilters, Query()],
+) -> Page[WidgetRead]:
+    items, total = await service.list_widgets(session, user, filters)
+    return Page[WidgetRead](
+        items=[WidgetRead.model_validate(i) for i in items],
+        total=total,
+        page=filters.page,
+        page_size=filters.page_size,
+    )
+
+
+@router.get("/{widget_id}", summary="Get a widget", responses=_ERRORS)
+async def get_widget(widget_id: uuid.UUID, user: CurrentUser, session: DbSession) -> WidgetRead:
+    return WidgetRead.model_validate(await service.get_widget(session, user, widget_id))
+
+
+@router.patch(
+    "/{widget_id}",
+    summary="Update a widget",
+    responses={**_ERRORS, 409: {"description": "Duplicate name"}},
+)
+async def update_widget(
+    widget_id: uuid.UUID, payload: WidgetUpdate, user: CurrentUser, session: DbSession
+) -> WidgetRead:
+    return WidgetRead.model_validate(await service.update_widget(session, user, widget_id, payload))
+
+
+@router.delete(
+    "/{widget_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a widget",
+    responses=_ERRORS,
+)
+async def delete_widget(widget_id: uuid.UUID, user: CurrentUser, session: DbSession) -> None:
+    await service.delete_widget(session, user, widget_id)

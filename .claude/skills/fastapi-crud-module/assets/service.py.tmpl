@@ -1,0 +1,81 @@
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import Select, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.errors import ConflictError, NotFoundError
+from app.core.pagination import escape_like, paginate
+from app.modules.users.models import User
+from app.modules.widgets.models import Widget
+from app.modules.widgets.schemas import WidgetCreate, WidgetFilters, WidgetUpdate
+
+_SORT_COLUMNS = {
+    "created_at": Widget.created_at,
+    "name": Widget.name,
+    "updated_at": Widget.updated_at,
+}
+
+
+def _owned(user: User) -> Select[tuple[Widget]]:
+    return select(Widget).where(Widget.owner_id == user.id, Widget.deleted_at.is_(None))
+
+
+async def get_widget(session: AsyncSession, user: User, widget_id: uuid.UUID) -> Widget:
+    widget = await session.scalar(_owned(user).where(Widget.id == widget_id))
+    if widget is None:
+        raise NotFoundError("Widget not found")
+    return widget
+
+
+async def list_widgets(
+    session: AsyncSession, user: User, filters: WidgetFilters
+) -> tuple[list[Any], int]:
+    stmt = _owned(user)
+    if filters.status:
+        stmt = stmt.where(Widget.status == filters.status)
+    if filters.tag:
+        stmt = stmt.where(Widget.tags.contains(filters.tag))
+    if filters.q:
+        pattern = f"%{escape_like(filters.q)}%"
+        stmt = stmt.where(
+            or_(Widget.name.ilike(pattern, escape="\\"), Widget.description.ilike(pattern, escape="\\"))
+        )
+    column = _SORT_COLUMNS[filters.sort.lstrip("-")]
+    stmt = stmt.order_by(column.desc() if filters.sort.startswith("-") else column.asc(), Widget.id)
+    return await paginate(session, stmt, filters)
+
+
+async def create_widget(session: AsyncSession, user: User, payload: WidgetCreate) -> Widget:
+    widget = Widget(owner_id=user.id, **payload.model_dump())
+    session.add(widget)
+    await _commit(session)
+    await session.refresh(widget)
+    return widget
+
+
+async def update_widget(
+    session: AsyncSession, user: User, widget_id: uuid.UUID, payload: WidgetUpdate
+) -> Widget:
+    widget = await get_widget(session, user, widget_id)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(widget, field, value)
+    await _commit(session)
+    await session.refresh(widget)
+    return widget
+
+
+async def delete_widget(session: AsyncSession, user: User, widget_id: uuid.UUID) -> None:
+    widget = await get_widget(session, user, widget_id)
+    widget.deleted_at = datetime.now(UTC)
+    await session.commit()
+
+
+async def _commit(session: AsyncSession) -> None:
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise ConflictError("A widget with this name already exists") from exc

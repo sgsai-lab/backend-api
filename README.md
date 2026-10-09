@@ -52,3 +52,16 @@ tests/         unit/ and integration/
 - Logs are structured JSON on stdout with Cloud Logging `severity`; never log secrets, tokens, passwords or OTPs.
 - Migrations follow expand → migrate → contract and must be backwards compatible with the deployed version.
 - Conventional commits; PRs need green CI.
+
+## AI coding assistants
+
+Context loads automatically for GitHub Copilot (VS Code / github.com) and Claude Code:
+
+| File | Purpose |
+| --- | --- |
+| [AGENTS.md](AGENTS.md) | Always-on project rules (Copilot reads it directly; Claude via [CLAUDE.md](CLAUDE.md)) |
+| [.github/copilot-instructions.md](.github/copilot-instructions.md) | Pointer for Copilot code review |
+| [.github/instructions/](.github/instructions/) | Path-specific rules (`applyTo` globs) |
+| [.claude/skills/](.claude/skills/) | On-demand workflows shared by Copilot and Claude: `implement-github-issue`, `fastapi-crud-module`, `alembic-migration`, `api-integration-tests`, `auth-security-review`, `cloud-run-deploy` |
+
+Invoke a skill explicitly with `/<skill-name>` in chat, or let the agent pick it from its description.
