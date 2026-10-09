@@ -22,6 +22,7 @@ from app.core.passwords import hash_password
 from app.core.rate_limit import RateLimiter, get_rate_limiter
 from app.db.session import get_session
 from app.main import create_app
+from app.modules.auth.apple_verifier import AppleTokenVerifier, get_apple_verifier
 from app.modules.auth.google_verifier import GoogleTokenVerifier, get_google_verifier
 from app.modules.auth.services.sessions import ClientContext, start_session
 from app.modules.users.models import User, UserRole
@@ -29,6 +30,7 @@ from app.modules.users.models import User, UserRole
 DEFAULT_PASSWORD = "Correct-Horse-Battery-9"
 GOOGLE_CLIENT_ID = "test-client-id"
 GOOGLE_KID = "test-kid"
+APPLE_CLIENT_ID = "com.example.web"
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -84,6 +86,13 @@ def google_verifier(google_key: rsa.RSAPrivateKey) -> GoogleTokenVerifier:
     return GoogleTokenVerifier([GOOGLE_CLIENT_ID], jwks=jwks)
 
 
+@pytest.fixture
+def apple_verifier(google_key: rsa.RSAPrivateKey) -> AppleTokenVerifier:
+    jwk = RSAAlgorithm.to_jwk(google_key.public_key(), as_dict=True)
+    jwks = {"keys": [{**jwk, "kid": GOOGLE_KID, "alg": "RS256", "use": "sig"}]}
+    return AppleTokenVerifier([APPLE_CLIENT_ID], jwks=jwks)
+
+
 class GoogleTokenFactory(Protocol):
     def __call__(self, **overrides: Any) -> str: ...
 
@@ -110,11 +119,31 @@ def google_token(google_key: rsa.RSAPrivateKey) -> GoogleTokenFactory:
 
 
 @pytest.fixture
+def apple_token(google_key: rsa.RSAPrivateKey) -> GoogleTokenFactory:
+    def make(**overrides: Any) -> str:
+        now = int(time.time())
+        claims = {
+            "iss": "https://appleid.apple.com",
+            "aud": APPLE_CLIENT_ID,
+            "sub": "001234.apple-sub.0001",
+            "email": "a.user@privaterelay.appleid.com",
+            "email_verified": "true",
+            "iat": now,
+            "exp": now + 600,
+            **overrides,
+        }
+        return jwt.encode(claims, google_key, algorithm="RS256", headers={"kid": GOOGLE_KID})
+
+    return make
+
+
+@pytest.fixture
 def app(
     session: AsyncSession,
     outbox: InMemoryEmailSender,
     limiter: RateLimiter,
     google_verifier: GoogleTokenVerifier,
+    apple_verifier: AppleTokenVerifier,
 ) -> FastAPI:
     async def _session() -> AsyncIterator[AsyncSession]:
         yield session
@@ -124,6 +153,7 @@ def app(
     application.dependency_overrides[get_email_sender] = lambda: outbox
     application.dependency_overrides[get_rate_limiter] = lambda: limiter
     application.dependency_overrides[get_google_verifier] = lambda: google_verifier
+    application.dependency_overrides[get_apple_verifier] = lambda: apple_verifier
     return application
 
 

@@ -12,30 +12,37 @@ from app.modules.users.models import User
 from app.modules.users.repository import get_user_by_email
 
 PROVIDER = "google"
+_LABELS = {"google": "Google", "apple": "Apple"}
 _FULL_NAME_MAX = 120
 
 
-async def _find_account(session: AsyncSession, subject: str) -> OAuthAccount | None:
+async def _find_account(
+    session: AsyncSession, subject: str, provider: str = PROVIDER
+) -> OAuthAccount | None:
     return await session.scalar(
         select(OAuthAccount).where(
-            OAuthAccount.provider == PROVIDER, OAuthAccount.provider_subject == subject
+            OAuthAccount.provider == provider, OAuthAccount.provider_subject == subject
         )
     )
 
 
-def _link(session: AsyncSession, user: User, identity: GoogleIdentity) -> None:
+def _link(
+    session: AsyncSession, user: User, identity: GoogleIdentity, provider: str = PROVIDER
+) -> None:
     session.add(
         OAuthAccount(
             user_id=user.id,
-            provider=PROVIDER,
+            provider=provider,
             provider_subject=identity.subject,
             email=identity.email,
         )
     )
 
 
-async def _resolve_user(session: AsyncSession, identity: GoogleIdentity) -> tuple[User, bool]:
-    account = await _find_account(session, identity.subject)
+async def _resolve_user(
+    session: AsyncSession, identity: GoogleIdentity, provider: str
+) -> tuple[User, bool]:
+    account = await _find_account(session, identity.subject, provider)
     if account is not None:
         user = await session.get(User, account.user_id)
         if user is None or user.deleted_at is not None:
@@ -47,10 +54,11 @@ async def _resolve_user(session: AsyncSession, identity: GoogleIdentity) -> tupl
         # Linking to an unverified local account would allow pre-registration account takeover.
         if user.email_verified_at is None:
             raise ConflictError(
-                "Sign in with your password and verify your email before using Google",
+                "Sign in with your password and verify your email before using "
+                f"{_LABELS[provider]}",
                 code="ACCOUNT_LINK_REQUIRED",
             )
-        _link(session, user, identity)
+        _link(session, user, identity, provider)
         return user, False
 
     user = User(
@@ -61,17 +69,23 @@ async def _resolve_user(session: AsyncSession, identity: GoogleIdentity) -> tupl
     )
     session.add(user)
     await session.flush()
-    _link(session, user, identity)
+    _link(session, user, identity, provider)
     return user, True
+
+
+async def sign_in_with_provider(
+    session: AsyncSession, provider: str, identity: GoogleIdentity, ctx: ClientContext
+) -> tuple[LoginResult, bool]:
+    user, created = await _resolve_user(session, identity, provider)
+    result = await complete_login(session, user, [provider], ctx)
+    await session.commit()
+    return result, created
 
 
 async def sign_in_with_google(
     session: AsyncSession, identity: GoogleIdentity, ctx: ClientContext
 ) -> tuple[LoginResult, bool]:
-    user, created = await _resolve_user(session, identity)
-    result = await complete_login(session, user, [PROVIDER], ctx)
-    await session.commit()
-    return result, created
+    return await sign_in_with_provider(session, PROVIDER, identity, ctx)
 
 
 async def link_google(session: AsyncSession, user: User, identity: GoogleIdentity) -> None:

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     admin_require_mfa: bool = False
 
     google_oauth_client_ids: list[str] = []
+    apple_client_ids: list[str] = []
 
     email_backend: Literal["smtp", "api", "memory"] = "smtp"
     email_from: str = "SGS AI <no-reply@sgsai.local>"

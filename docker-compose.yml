@@ -31,6 +31,7 @@ services:
       API_UPSTREAM: http://api:8080
       # Public OAuth web client ID for the Google button (must be in the API's GOOGLE_OAUTH_CLIENT_IDS).
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
     depends_on:
       api:
         condition: service_started
@@ -51,6 +52,7 @@ services:
       <<: *api-env
       FRONTEND_BASE_URL: http://localhost:8090
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

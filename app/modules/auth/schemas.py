@@ -92,6 +92,12 @@ class GoogleRequest(StrictModel):
     nonce: Annotated[str, Field(max_length=256)] | None = None
 
 
+class AppleRequest(GoogleRequest):
+    full_name: FullName | None = Field(
+        default=None, description="Apple shares the name only on first sign-in"
+    )
+
+
 class ResetPasswordRequest(StrictModel):
     token: OpaqueToken
     new_password: NewPassword

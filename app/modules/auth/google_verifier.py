@@ -34,7 +34,12 @@ def _max_age(cache_control: str) -> int:
 
 
 class GoogleTokenVerifier:
-    """Verifies Google ID tokens against Google's published JWKS (cached per Cache-Control)."""
+    """Verifies OIDC ID tokens against the provider's published JWKS (cached per Cache-Control)."""
+
+    certs_url = GOOGLE_CERTS_URL
+    issuers = GOOGLE_ISSUERS
+    label = "Google"
+    code = "GOOGLE"
 
     def __init__(self, client_ids: list[str], jwks: dict[str, Any] | None = None) -> None:
         self._client_ids = client_ids
@@ -44,7 +49,7 @@ class GoogleTokenVerifier:
     async def _signing_key(self, kid: str) -> Any:
         if self._jwks is None or time.monotonic() >= self._expires_at:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(GOOGLE_CERTS_URL)
+                response = await client.get(self.certs_url)
                 response.raise_for_status()
             self._jwks = response.json()
             self._expires_at = time.monotonic() + _max_age(
@@ -58,7 +63,12 @@ class GoogleTokenVerifier:
 
     async def verify(self, id_token: str, nonce: str | None) -> GoogleIdentity:
         if not self._client_ids:
-            raise AppError("Google sign-in is not configured", code="GOOGLE_SIGNIN_UNAVAILABLE")
+            raise AppError(
+                f"{self.label} sign-in is not configured", code=f"{self.code}_SIGNIN_UNAVAILABLE"
+            )
+        invalid = UnauthenticatedError(
+            f"Invalid {self.label} token", code=f"INVALID_{self.code}_TOKEN"
+        )
         try:
             kid = str(jwt.get_unverified_header(id_token).get("kid"))
             claims: dict[str, Any] = jwt.decode(
@@ -69,12 +79,16 @@ class GoogleTokenVerifier:
                 options={"require": ["exp", "iat", "iss", "aud", "sub"]},
             )
         except (jwt.PyJWTError, httpx.HTTPError) as exc:
-            log.info("google_token_rejected", exc_type=type(exc).__name__)
-            raise UnauthenticatedError("Invalid Google token", code="INVALID_GOOGLE_TOKEN") from exc
-        if claims.get("iss") not in GOOGLE_ISSUERS or (nonce and claims.get("nonce") != nonce):
-            raise UnauthenticatedError("Invalid Google token", code="INVALID_GOOGLE_TOKEN")
-        if claims.get("email_verified") is not True or not claims.get("email"):
-            raise AppError("Google email is not verified", code="GOOGLE_EMAIL_NOT_VERIFIED")
+            provider = self.code.lower()
+            log.info("oauth_token_rejected", provider=provider, exc_type=type(exc).__name__)
+            raise invalid from exc
+        if claims.get("iss") not in self.issuers or (nonce and claims.get("nonce") != nonce):
+            raise invalid
+        # Apple encodes email_verified as the string "true".
+        if claims.get("email_verified") not in (True, "true") or not claims.get("email"):
+            raise AppError(
+                f"{self.label} email is not verified", code=f"{self.code}_EMAIL_NOT_VERIFIED"
+            )
         return GoogleIdentity(
             subject=str(claims["sub"]),
             email=str(claims["email"]),

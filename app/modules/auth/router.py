@@ -3,10 +3,10 @@ from typing import Any
 from fastapi import APIRouter
 
 from app.core.tokens import jwks
-from app.modules.auth.routes import google, login, mfa, password, registration
+from app.modules.auth.routes import apple, google, login, mfa, password, registration
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-for module in (registration, login, google, password, mfa):
+for module in (registration, login, google, apple, password, mfa):
     router.include_router(module.router)
 
 well_known_router = APIRouter(tags=["auth"])
