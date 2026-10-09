@@ -25,6 +25,7 @@ _DESCRIPTIONS = {
     403: "Forbidden",
     404: "Resource not found",
     409: "Conflict",
+    412: "Precondition failed (stale If-Match)",
     422: "Validation error",
     429: "Rate limited",
 }

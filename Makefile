@@ -1,4 +1,4 @@
-.PHONY: install dev lint format typecheck test cov audit check migrate revision up down image scan admin
+.PHONY: install dev lint format typecheck test cov audit check migrate revision up down image scan admin fullstack google-client-id
 
 install:
 	uv sync
@@ -38,7 +38,13 @@ up:
 	docker compose up -d --build
 
 down:
-	docker compose down
+	docker compose --profile fullstack down
+
+fullstack:
+	docker compose --profile fullstack up -d --build fullstack
+
+google-client-id:
+	./scripts/google-client-id.sh $(project)
 
 image:
 	docker build -t sgsai-backend-api:local .

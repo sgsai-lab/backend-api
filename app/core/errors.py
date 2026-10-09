@@ -67,6 +67,11 @@ class ConflictError(AppError):
     code = "CONFLICT"
 
 
+class PreconditionFailedError(AppError):
+    status_code = status.HTTP_412_PRECONDITION_FAILED
+    code = "PRECONDITION_FAILED"
+
+
 class ValidationFailedError(AppError):
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     code = "VALIDATION_ERROR"

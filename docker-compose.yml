@@ -14,6 +14,43 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       FRONTEND_BASE_URL: http://localhost:3000
+      # Webapp origins (separate service :3000, bundled image :8090); required for cookie refresh.
+      CORS_ALLOW_ORIGINS: '["http://localhost:3000","http://localhost:8090"]'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+
+  # Static site + contact server behind nginx; proxies /api/v1 to the api service.
+  webapp:
+    build: ./webapp
+    ports:
+      - "3000:8080"
+    environment:
+      API_UPSTREAM: http://api:8080
+      # Public OAuth web client ID for the Google button (must be in the API's GOOGLE_OAUTH_CLIENT_IDS).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    depends_on:
+      api:
+        condition: service_started
+
+  # API + webapp bundled in one container (Dockerfile.fullstack).
+  # Run: docker compose --profile fullstack up -d --build fullstack  ->  http://localhost:8090
+  fullstack:
+    profiles: ["fullstack"]
+    build:
+      context: .
+      dockerfile: Dockerfile.fullstack
+    ports:
+      - "8090:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *api-env
+      FRONTEND_BASE_URL: http://localhost:8090
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
