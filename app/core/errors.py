@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, ClassVar
 
 import structlog
 from fastapi import FastAPI, Request, status
@@ -11,8 +11,8 @@ log = structlog.get_logger(__name__)
 
 
 class AppError(Exception):
-    status_code = status.HTTP_400_BAD_REQUEST
-    code = "BAD_REQUEST"
+    status_code: ClassVar[int] = status.HTTP_400_BAD_REQUEST
+    code: str = "BAD_REQUEST"
 
     def __init__(
         self,
@@ -20,17 +20,36 @@ class AppError(Exception):
         *,
         code: str | None = None,
         details: list[dict[str, Any]] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         if code:
             self.code = code
         self.details = details or []
+        self.headers = dict(headers or {})
 
 
 class UnauthenticatedError(AppError):
     status_code = status.HTTP_401_UNAUTHORIZED
     code = "UNAUTHENTICATED"
+
+    def __init__(
+        self, message: str = "Authentication required", *, code: str | None = None
+    ) -> None:
+        super().__init__(message, code=code, headers={"WWW-Authenticate": "Bearer"})
+
+
+class InvalidCredentialsError(UnauthenticatedError):
+    def __init__(self) -> None:
+        super().__init__("Invalid email or password", code="INVALID_CREDENTIALS")
+
+
+class InvalidTokenError(AppError):
+    code = "INVALID_TOKEN"
+
+    def __init__(self, message: str = "The token is invalid or has expired") -> None:
+        super().__init__(message)
 
 
 class ForbiddenError(AppError):
@@ -48,13 +67,43 @@ class ConflictError(AppError):
     code = "CONFLICT"
 
 
+class ValidationFailedError(AppError):
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    code = "VALIDATION_ERROR"
+
+    def __init__(self, field: str, message: str) -> None:
+        super().__init__(
+            "Request validation failed", details=[{"field": field, "message": message}]
+        )
+
+
+class RateLimitedError(AppError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "RATE_LIMITED"
+
+    def __init__(self, retry_after: int) -> None:
+        super().__init__(
+            "Too many requests, please retry later",
+            headers={"Retry-After": str(max(retry_after, 1))},
+        )
+
+
 _HTTP_CODES = {
     401: "UNAUTHENTICATED",
     403: "FORBIDDEN",
     404: "RESOURCE_NOT_FOUND",
     405: "METHOD_NOT_ALLOWED",
+    413: "PAYLOAD_TOO_LARGE",
     429: "RATE_LIMITED",
 }
+
+
+def error_body(
+    request_id: str | None, code: str, message: str, details: list[dict[str, Any]]
+) -> dict[str, Any]:
+    return {
+        "error": {"code": code, "message": message, "requestId": request_id, "details": details}
+    }
 
 
 def error_response(
@@ -68,19 +117,16 @@ def error_response(
     return JSONResponse(
         status_code=status_code,
         headers=headers,
-        content={
-            "error": {
-                "code": code,
-                "message": message,
-                "requestId": getattr(request.state, "request_id", None),
-                "details": details or [],
-            }
-        },
+        content=error_body(
+            getattr(request.state, "request_id", None), code, message, details or []
+        ),
     )
 
 
 async def _app_error(request: Request, exc: AppError) -> JSONResponse:
-    return error_response(request, exc.status_code, exc.code, exc.message, exc.details)
+    return error_response(
+        request, exc.status_code, exc.code, exc.message, exc.details, exc.headers or None
+    )
 
 
 async def _validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

@@ -6,9 +6,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_settings
 from app.db.base import Base
-
-# Import every module's models here so autogenerate can see them, e.g.:
-# from app.modules.users import models as _users
+from app.modules.auth import models as _auth_models  # noqa: F401
+from app.modules.users import models as _users_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

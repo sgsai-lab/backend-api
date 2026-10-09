@@ -5,6 +5,24 @@ from typing import Any
 import structlog
 from structlog.types import EventDict, Processor
 
+REDACTED = "[REDACTED]"
+_SENSITIVE_KEYS = frozenset(
+    {"authorization", "cookie", "code", "otp", "recovery_code", "mfa_code", "id_token", "nonce"}
+)
+_SENSITIVE_FRAGMENTS = ("password", "token", "secret")
+
+
+def _is_sensitive(key: str) -> bool:
+    lowered = key.lower()
+    return lowered in _SENSITIVE_KEYS or any(f in lowered for f in _SENSITIVE_FRAGMENTS)
+
+
+def redact_sensitive(_: Any, __: str, event_dict: EventDict) -> EventDict:
+    for key in event_dict:
+        if _is_sensitive(key):
+            event_dict[key] = REDACTED
+    return event_dict
+
 
 def _to_cloud_severity(_: Any, __: str, event_dict: EventDict) -> EventDict:
     # Cloud Logging reads `severity` and `message` from JSON payloads.
@@ -15,6 +33,7 @@ def _to_cloud_severity(_: Any, __: str, event_dict: EventDict) -> EventDict:
 def configure_logging(level: str, json_logs: bool) -> None:
     processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
+        redact_sensitive,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),

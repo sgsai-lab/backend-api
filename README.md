@@ -14,20 +14,42 @@ make migrate          # alembic upgrade head
 make dev              # http://localhost:8080/docs
 ```
 
-Or run everything in containers: `docker compose up --build`.
+Or run everything in containers: `docker compose up --build` (a one-shot `migrate` service runs
+`alembic upgrade head` before the API starts).
+
+Create the first administrator: `make admin email=you@example.com` (prompts for a password).
 
 | URL | Purpose |
 | --- | --- |
 | `GET /healthz` | Liveness (no dependencies) |
 | `GET /readyz` | Readiness (checks DB, 503 when unreachable) |
+| `GET /.well-known/jwks.json` | Public keys for verifying access tokens |
 | `/docs` | OpenAPI UI (disabled in production) |
 | http://localhost:8025 | Mailpit — local email inbox |
+
+## API overview (`/api/v1`)
+
+| Area | Endpoints |
+| --- | --- |
+| Sign-up | `POST auth/signup`, `POST auth/verify-email`, `POST auth/verify-email/resend` |
+| Sign-in & sessions | `POST auth/login`, `POST auth/token/refresh`, `POST auth/logout`, `POST auth/logout-all`, `GET auth/sessions`, `DELETE auth/sessions/{id}` |
+| Google | `POST auth/google`, `POST auth/google/link`, `DELETE auth/google/link` |
+| Password | `POST auth/password/forgot`, `.../reset`, `.../change`, `.../set` |
+| MFA (TOTP) | `GET auth/mfa`, `POST auth/mfa/totp/setup`, `.../totp/confirm`, `POST auth/mfa/verify`, `POST auth/mfa/recovery-codes`, `DELETE auth/mfa/totp` |
+| Users | `GET/PATCH/DELETE users/me`; admin: `POST/GET users`, `GET/PATCH/DELETE users/{id}` |
+
+Auth model (ADR-001): ES256 access JWT (15 min) + opaque rotating refresh token (30 days,
+reuse detection). Web clients send `X-Client: web` and receive the refresh token in an
+`HttpOnly` `__Host-refresh` cookie instead of the response body. Admin endpoints require a
+session that completed MFA.
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
 | `make check` | Lint + typecheck + tests (same as CI) |
+| `make cov` | Tests with coverage (fails under 80%) |
+| `make audit` | Dependency vulnerability audit (pip-audit) |
 | `make format` | Auto-fix lint and format |
 | `make revision m="add users"` | Autogenerate a migration |
 | `make scan` | Build image and Trivy-scan it |
@@ -36,14 +58,23 @@ Or run everything in containers: `docker compose up --build`.
 
 ```
 app/
-  core/        config, logging, errors, middleware
-  db/          SQLAlchemy base + async session
+  core/        config, logging, errors, middleware, tokens, passwords, email, rate limit
+  db/          SQLAlchemy base, mixins, async session
   api/         health routes, /api/v1 router
   modules/     feature modules: auth, users, projects, products
-               (each: router.py, schemas.py, service.py, models.py)
+               (router.py, schemas.py, service.py, models.py; auth splits routes/ and services/)
+  templates/   email templates (text + HTML)
 migrations/    Alembic migrations
-tests/         unit/ and integration/
+tests/         unit/ (no DB) and integration/ (real Postgres)
 ```
+
+## Quality gates
+
+CI (`.github/workflows/ci.yml`) runs on every PR: ruff + mypy `--strict` (`lint`),
+migrations up/down/up + pytest with coverage ≥ 80% (`test`), SonarQube Cloud quality gate
+(`sonar`, needs the `SONAR_TOKEN` secret), pip-audit + Trivy (`security`), and Docker build +
+image scan (`build`). PR titles must follow Conventional Commits. Merges to `develop` deploy
+to Cloud Run via `.github/workflows/deploy-dev.yml` (Workload Identity Federation).
 
 ## Conventions
 
