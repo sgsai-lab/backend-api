@@ -1,0 +1,49 @@
+import uuid
+from datetime import datetime
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+from app.core.pagination import PageParams
+from app.modules.widgets.models import WidgetStatus
+
+Tag = Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1, max_length=32)]
+WidgetSort = Literal["created_at", "-created_at", "name", "-name", "updated_at", "-updated_at"]
+
+
+class WidgetCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=5000)
+    status: WidgetStatus = WidgetStatus.DRAFT
+    tags: list[Tag] = Field(default_factory=list, max_length=20)
+
+
+class WidgetUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=5000)
+    status: WidgetStatus | None = None
+    tags: list[Tag] | None = Field(default=None, max_length=20)
+
+
+class WidgetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    owner_id: uuid.UUID
+    name: str
+    description: str | None
+    status: WidgetStatus
+    tags: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class WidgetFilters(PageParams):
+    status: WidgetStatus | None = None
+    tag: list[str] = Field(default_factory=list)
+    q: str | None = Field(default=None, max_length=100)
+    sort: WidgetSort = "-created_at"

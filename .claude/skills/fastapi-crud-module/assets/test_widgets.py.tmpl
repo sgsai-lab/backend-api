@@ -1,0 +1,105 @@
+import uuid
+from collections.abc import Awaitable, Callable
+
+import pytest
+from httpx import AsyncClient
+
+pytestmark = pytest.mark.integration
+
+# Fixtures `user_factory` and `auth_headers` come from tests/integration/conftest.py (API-06).
+AuthHeaders = Callable[..., Awaitable[dict[str, str]]]
+
+
+async def _create(client: AsyncClient, headers: dict[str, str], **overrides: object) -> dict:
+    body = {"name": "Alpha", "tags": ["Blue"], **overrides}
+    response = await client.post("/api/v1/widgets", json=body, headers=headers)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+async def test_create_widget_sets_owner_from_token(client: AsyncClient, auth_headers: AuthHeaders) -> None:
+    headers = await auth_headers()
+
+    widget = await _create(client, headers)
+
+    me = (await client.get("/api/v1/users/me", headers=headers)).json()
+    assert widget["owner_id"] == me["id"]
+    assert widget["tags"] == ["blue"]
+
+
+async def test_create_widget_rejects_owner_id_in_body(client: AsyncClient, auth_headers: AuthHeaders) -> None:
+    headers = await auth_headers()
+
+    response = await client.post(
+        "/api/v1/widgets", json={"name": "X", "owner_id": str(uuid.uuid4())}, headers=headers
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_create_widget_duplicate_name_returns_409(client: AsyncClient, auth_headers: AuthHeaders) -> None:
+    headers = await auth_headers()
+    await _create(client, headers)
+
+    response = await client.post("/api/v1/widgets", json={"name": "Alpha"}, headers=headers)
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CONFLICT"
+
+
+async def test_widget_endpoints_require_auth(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/widgets")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHENTICATED"
+
+
+@pytest.mark.parametrize("method", ["GET", "PATCH", "DELETE"])
+async def test_other_users_widget_returns_404(
+    client: AsyncClient, auth_headers: AuthHeaders, method: str
+) -> None:
+    owner, intruder = await auth_headers(), await auth_headers()
+    widget = await _create(client, owner)
+
+    response = await client.request(
+        method, f"/api/v1/widgets/{widget['id']}", headers=intruder,
+        json={"name": "Hacked"} if method == "PATCH" else None,
+    )
+
+    assert response.status_code == 404
+
+
+async def test_list_widgets_only_returns_mine_paginated(client: AsyncClient, auth_headers: AuthHeaders) -> None:
+    mine, other = await auth_headers(), await auth_headers()
+    for i in range(3):
+        await _create(client, mine, name=f"W{i}")
+    await _create(client, other, name="Theirs")
+
+    response = await client.get("/api/v1/widgets?page_size=2&sort=name", headers=mine)
+
+    body = response.json()
+    assert body["total"] == 3
+    assert [w["name"] for w in body["items"]] == ["W0", "W1"]
+
+
+async def test_patch_widget_updates_only_sent_fields(client: AsyncClient, auth_headers: AuthHeaders) -> None:
+    headers = await auth_headers()
+    widget = await _create(client, headers, description="keep")
+
+    response = await client.patch(f"/api/v1/widgets/{widget['id']}", json={"name": "Beta"}, headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Beta"
+    assert response.json()["description"] == "keep"
+
+
+async def test_deleted_widget_is_not_found(client: AsyncClient, auth_headers: AuthHeaders) -> None:
+    headers = await auth_headers()
+    widget = await _create(client, headers)
+
+    delete = await client.delete(f"/api/v1/widgets/{widget['id']}", headers=headers)
+    get = await client.get(f"/api/v1/widgets/{widget['id']}", headers=headers)
+
+    assert delete.status_code == 204
+    assert get.status_code == 404
