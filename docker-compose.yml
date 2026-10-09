@@ -3,6 +3,10 @@ services:
     build: .
     ports:
       - "8080:8080"
+    # Local secrets (e.g. MFA_ENCRYPTION_KEY) persist across restarts; keys below take precedence.
+    env_file:
+      - path: .env
+        required: false
     environment: &api-env
       ENVIRONMENT: local
       LOG_JSON: "false"

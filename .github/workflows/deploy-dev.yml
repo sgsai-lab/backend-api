@@ -100,6 +100,8 @@ jobs:
         env:
           FRONTEND_BASE_URL: ${{ vars.FRONTEND_BASE_URL || 'https://sgsaitechnology.com' }}
           CORS_ALLOW_ORIGINS: ${{ vars.CORS_ALLOW_ORIGINS || '["https://sgsaitechnology.com"]' }}
+          MFA_ENABLED: ${{ vars.MFA_ENABLED || 'true' }}
+          ADMIN_REQUIRE_MFA: ${{ vars.ADMIN_REQUIRE_MFA || 'false' }}
         run: |
           set -euo pipefail
           sql_args=()
@@ -112,7 +114,7 @@ jobs:
             --image "$IMAGE" \
             --service-account "$GCP_RUNTIME_SERVICE_ACCOUNT" \
             --set-secrets "$SECRETS" \
-            --set-env-vars "^@^ENVIRONMENT=development@LOG_JSON=true@GCP_PROJECT_ID=$GCP_PROJECT_ID@EMAIL_BACKEND=api@FRONTEND_BASE_URL=$FRONTEND_BASE_URL@CORS_ALLOW_ORIGINS=$CORS_ALLOW_ORIGINS" \
+            --set-env-vars "^@^ENVIRONMENT=development@LOG_JSON=true@GCP_PROJECT_ID=$GCP_PROJECT_ID@EMAIL_BACKEND=api@FRONTEND_BASE_URL=$FRONTEND_BASE_URL@CORS_ALLOW_ORIGINS=$CORS_ALLOW_ORIGINS@MFA_ENABLED=$MFA_ENABLED@ADMIN_REQUIRE_MFA=$ADMIN_REQUIRE_MFA" \
             --min-instances 0 --max-instances 3 \
             --memory 512Mi --cpu 1 --timeout 60s \
             --allow-unauthenticated \

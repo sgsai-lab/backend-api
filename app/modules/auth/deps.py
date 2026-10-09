@@ -59,6 +59,11 @@ async def require_admin(auth: CurrentAuth) -> User:
 AdminUser = Annotated[User, Depends(require_admin)]
 
 
+async def require_mfa_feature() -> None:
+    if not get_settings().mfa_enabled:
+        raise ForbiddenError("Two-factor enrolment is not enabled", code="FEATURE_DISABLED")
+
+
 async def require_verified_email(user: CurrentUser) -> User:
     if user.email_verified_at is None:
         raise ForbiddenError("Verify your email address first", code="EMAIL_NOT_VERIFIED")

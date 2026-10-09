@@ -1,8 +1,10 @@
 import uuid
 from collections.abc import Awaitable, Callable
 
+import pytest
 from httpx import AsyncClient
 
+from app.core.config import get_settings
 from app.core.email import InMemoryEmailSender
 from app.modules.users.models import UserRole
 from tests.integration.conftest import AuthHeaders, UserFactory
@@ -30,6 +32,17 @@ async def test_admin_routes_require_mfa_session(
     response = await client.get(USERS, headers=headers)
 
     assert response.json()["error"]["code"] == "MFA_REQUIRED"
+
+
+async def test_admin_routes_allow_password_session_when_mfa_not_required(
+    client: AsyncClient, auth_headers: AuthHeaders, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "admin_require_mfa", False)
+    headers = await auth_headers(role=UserRole.ADMIN, amr=("pwd",))
+
+    response = await client.get(USERS, headers=headers)
+
+    assert response.status_code == 200
 
 
 async def test_admin_lists_users_with_filters_and_pagination(

@@ -109,6 +109,7 @@ class SetPasswordRequest(StrictModel):
 
 
 class MfaStatusResponse(BaseModel):
+    available: bool = Field(description="Whether new MFA enrolment is enabled on this server")
     enabled: bool
     methods: list[str]
     recovery_codes_remaining: int
