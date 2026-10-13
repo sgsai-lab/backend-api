@@ -18,11 +18,17 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 from app.core.email import InMemoryEmailSender, get_email_sender
+from app.core.errors import UnauthenticatedError
 from app.core.passwords import hash_password
 from app.core.rate_limit import RateLimiter, get_rate_limiter
 from app.db.session import get_session
 from app.main import create_app
 from app.modules.auth.apple_verifier import AppleTokenVerifier, get_apple_verifier
+from app.modules.auth.firebase_verifier import (
+    FirebaseIdentity,
+    FirebaseTokenVerifier,
+    get_firebase_verifier,
+)
 from app.modules.auth.google_verifier import GoogleTokenVerifier, get_google_verifier
 from app.modules.auth.services.sessions import ClientContext, start_session
 from app.modules.users.models import User, UserRole
@@ -97,6 +103,36 @@ class GoogleTokenFactory(Protocol):
     def __call__(self, **overrides: Any) -> str: ...
 
 
+class FakeFirebaseVerifier(FirebaseTokenVerifier):
+    def __init__(self) -> None:
+        super().__init__("test-project")
+        self.identities: dict[str, FirebaseIdentity] = {}
+        self.revoked_uids: list[str] = []
+
+    async def verify(self, id_token: str) -> FirebaseIdentity:
+        identity = self.identities.get(id_token)
+        if identity is None or identity.uid in self.revoked_uids:
+            raise UnauthenticatedError("Invalid Firebase ID token")
+        return identity
+
+    async def revoke(self, uid: str) -> None:
+        self.revoked_uids.append(uid)
+
+
+@pytest.fixture
+def firebase_verifier() -> FakeFirebaseVerifier:
+    verifier = FakeFirebaseVerifier()
+    verifier.identities["firebase-test-id-token-000000000000"] = FirebaseIdentity(
+        uid="firebase-uid-1",
+        email="firebase.user@example.com",
+        name="Firebase User",
+        picture=None,
+        auth_time=int(time.time()),
+        mfa_enabled=False,
+    )
+    return verifier
+
+
 @pytest.fixture
 def google_token(google_key: rsa.RSAPrivateKey) -> GoogleTokenFactory:
     def make(**overrides: Any) -> str:
@@ -142,6 +178,7 @@ def app(
     session: AsyncSession,
     outbox: InMemoryEmailSender,
     limiter: RateLimiter,
+    firebase_verifier: FakeFirebaseVerifier,
     google_verifier: GoogleTokenVerifier,
     apple_verifier: AppleTokenVerifier,
 ) -> FastAPI:
@@ -152,6 +189,7 @@ def app(
     application.dependency_overrides[get_session] = _session
     application.dependency_overrides[get_email_sender] = lambda: outbox
     application.dependency_overrides[get_rate_limiter] = lambda: limiter
+    application.dependency_overrides[get_firebase_verifier] = lambda: firebase_verifier
     application.dependency_overrides[get_google_verifier] = lambda: google_verifier
     application.dependency_overrides[get_apple_verifier] = lambda: apple_verifier
     return application

@@ -1,4 +1,5 @@
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
@@ -8,6 +9,7 @@ from app.core.openapi import error_responses
 from app.core.rate_limit import Limiter, rate_limit
 from app.db.session import DbSession
 from app.modules.auth.deps import Client, CurrentAuth
+from app.modules.auth.firebase_verifier import FirebaseTokenVerifier, get_firebase_verifier
 from app.modules.auth.responses import (
     clear_refresh_cookie,
     login_response,
@@ -76,8 +78,16 @@ async def refresh(
     summary="Sign out the current session",
     responses=error_responses(401),
 )
-async def logout(auth: CurrentAuth, session: DbSession, response: Response) -> None:
-    await sessions.revoke_session(session, auth.user.id, auth.claims.session_id)
+async def logout(
+    auth: CurrentAuth,
+    session: DbSession,
+    response: Response,
+    firebase_verifier: Annotated[FirebaseTokenVerifier, Depends(get_firebase_verifier)],
+) -> None:
+    if auth.firebase_uid is not None:
+        await firebase_verifier.revoke(auth.firebase_uid)
+    else:
+        await sessions.revoke_session(session, auth.user.id, auth.claims.session_id)
     await session.commit()
     clear_refresh_cookie(response)
 
@@ -88,14 +98,24 @@ async def logout(auth: CurrentAuth, session: DbSession, response: Response) -> N
     summary="Sign out every session",
     responses=error_responses(401),
 )
-async def logout_all(auth: CurrentAuth, session: DbSession, response: Response) -> None:
-    await sessions.revoke_all_sessions(session, auth.user.id)
+async def logout_all(
+    auth: CurrentAuth,
+    session: DbSession,
+    response: Response,
+    firebase_verifier: Annotated[FirebaseTokenVerifier, Depends(get_firebase_verifier)],
+) -> None:
+    if auth.firebase_uid is not None:
+        await firebase_verifier.revoke(auth.firebase_uid)
+    else:
+        await sessions.revoke_all_sessions(session, auth.user.id)
     await session.commit()
     clear_refresh_cookie(response)
 
 
 @router.get("/sessions", summary="List my active sessions", responses=error_responses(401))
 async def list_sessions(auth: CurrentAuth, session: DbSession) -> list[SessionRead]:
+    if auth.firebase_uid is not None:
+        return []
     rows = await sessions.list_active_sessions(session, auth.user.id)
     return [
         SessionRead(

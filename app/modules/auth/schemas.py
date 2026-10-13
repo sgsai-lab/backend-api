@@ -92,6 +92,10 @@ class GoogleRequest(StrictModel):
     nonce: Annotated[str, Field(max_length=256)] | None = None
 
 
+class FirebaseRequest(StrictModel):
+    id_token: Annotated[str, Field(min_length=20, max_length=4096)]
+
+
 class AppleRequest(GoogleRequest):
     full_name: FullName | None = Field(
         default=None, description="Apple shares the name only on first sign-in"

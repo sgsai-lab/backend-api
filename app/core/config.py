@@ -44,6 +44,7 @@ class Settings(BaseSettings):
 
     google_oauth_client_ids: list[str] = []
     apple_client_ids: list[str] = []
+    firebase_project_id: str | None = None
 
     email_backend: Literal["smtp", "api", "memory"] = "smtp"
     email_from: str = "SGS AI <no-reply@sgsai.local>"
@@ -75,6 +76,8 @@ class Settings(BaseSettings):
             for name in ("jwt_private_key", "mfa_encryption_key")
             if getattr(self, name) is None
         ]
+        if self.firebase_project_id is None:
+            missing.append("firebase_project_id")
         if self.email_backend == "api" and self.email_api_key is None:
             missing.append("email_api_key")
         if missing:

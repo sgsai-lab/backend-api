@@ -116,6 +116,7 @@ def test_production_accepts_complete_secrets() -> None:
         environment="production",
         jwt_private_key=SecretStr("pem"),
         mfa_encryption_key=SecretStr("key"),
+        firebase_project_id="sgsai-prod",
         email_backend="api",
         email_api_key=SecretStr("sg"),
     )

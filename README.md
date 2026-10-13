@@ -33,14 +33,17 @@ Create the first administrator: `make admin email=you@example.com` (prompts for 
 | --- | --- |
 | Sign-up | `POST auth/signup`, `POST auth/verify-email`, `POST auth/verify-email/resend` |
 | Sign-in & sessions | `POST auth/login`, `POST auth/token/refresh`, `POST auth/logout`, `POST auth/logout-all`, `GET auth/sessions`, `DELETE auth/sessions/{id}` |
+| Firebase mobile | `POST auth/firebase` bootstrap; Firebase ID token as bearer on API requests |
 | Google | `POST auth/google`, `POST auth/google/link`, `DELETE auth/google/link` |
 | Password | `POST auth/password/forgot`, `.../reset`, `.../change`, `.../set` |
 | MFA (TOTP) | `GET auth/mfa`, `POST auth/mfa/totp/setup`, `.../totp/confirm`, `POST auth/mfa/verify`, `POST auth/mfa/recovery-codes`, `DELETE auth/mfa/totp` |
 | Users | `GET/PATCH/DELETE users/me`; admin: `POST/GET users`, `GET/PATCH/DELETE users/{id}` |
 
-Auth model (ADR-001): ES256 access JWT (15 min) + opaque rotating refresh token (30 days,
-reuse detection). Web clients send `X-Client: web` and receive the refresh token in an
-`HttpOnly` `__Host-refresh` cookie instead of the response body.
+Auth model ([ADR-001](docs/adr-001-firebase-mobile-auth.md)): mobile uses Firebase ID
+tokens validated against the environment's Firebase project, including revocation checks;
+backend maps Firebase UIDs to local users. Existing web/legacy clients retain ES256 access
+JWT (15 min) plus opaque rotating refresh tokens (30 days, reuse detection). Web clients
+send `X-Client: web` and receive refresh tokens in an `HttpOnly` `__Host-refresh` cookie.
 
 MFA feature flags (env vars; per-environment GitHub variables for deploys):
 

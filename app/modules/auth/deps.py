@@ -9,6 +9,8 @@ from app.core.errors import ForbiddenError, UnauthenticatedError
 from app.core.rate_limit import client_ip
 from app.core.tokens import AccessClaims, decode_access_token
 from app.db.session import DbSession
+from app.modules.auth.firebase_verifier import FirebaseTokenVerifier, get_firebase_verifier
+from app.modules.auth.services.firebase import firebase_session_id, get_linked_user
 from app.modules.auth.services.sessions import ClientContext, is_session_active
 from app.modules.users.models import User, UserRole
 from app.modules.users.repository import get_active_user
@@ -20,15 +22,33 @@ _bearer = HTTPBearer(auto_error=False, description="Access token from /api/v1/au
 class AuthContext:
     user: User
     claims: AccessClaims
+    firebase_uid: str | None = None
 
 
 async def get_auth_context(
     session: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    firebase_verifier: Annotated[FirebaseTokenVerifier, Depends(get_firebase_verifier)],
 ) -> AuthContext:
     if credentials is None:
         raise UnauthenticatedError()
-    claims = decode_access_token(credentials.credentials)
+    try:
+        claims = decode_access_token(credentials.credentials)
+    except UnauthenticatedError as exc:
+        if exc.code == "TOKEN_EXPIRED":
+            raise
+        if not firebase_verifier.is_configured:
+            raise
+        identity = await firebase_verifier.verify(credentials.credentials)
+        firebase_user = await get_linked_user(session, identity.uid)
+        methods = ("firebase", "mfa") if identity.mfa_enabled else ("firebase",)
+        claims = AccessClaims(
+            user_id=firebase_user.id,
+            session_id=firebase_session_id(identity.uid, identity.auth_time),
+            role=firebase_user.role.value,
+            amr=methods,
+        )
+        return AuthContext(user=firebase_user, claims=claims, firebase_uid=identity.uid)
     user = await get_active_user(session, claims.user_id)
     # Checking the session makes logout, password reset and disabling take effect immediately.
     if user is None or not await is_session_active(session, user.id, claims.session_id):
