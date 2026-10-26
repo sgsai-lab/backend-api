@@ -30,7 +30,7 @@ class AppError(Exception):
 
 class UnauthenticatedError(AppError):
     status_code = status.HTTP_401_UNAUTHORIZED
-    code = "UNAUTHENTICATED"
+    code = "UNAUTHORIZED"
 
 
 class ForbiddenError(AppError):
@@ -40,7 +40,7 @@ class ForbiddenError(AppError):
 
 class NotFoundError(AppError):
     status_code = status.HTTP_404_NOT_FOUND
-    code = "RESOURCE_NOT_FOUND"
+    code = "NOT_FOUND"
 
 
 class ConflictError(AppError):
@@ -48,10 +48,11 @@ class ConflictError(AppError):
     code = "CONFLICT"
 
 
+# Same codes and envelope as sgsai-lab/home docs/api.md (ADR-002), so clients can switch upstreams.
 _HTTP_CODES = {
-    401: "UNAUTHENTICATED",
+    401: "UNAUTHORIZED",
     403: "FORBIDDEN",
-    404: "RESOURCE_NOT_FOUND",
+    404: "NOT_FOUND",
     405: "METHOD_NOT_ALLOWED",
     429: "RATE_LIMITED",
 }
@@ -72,8 +73,8 @@ def error_response(
             "error": {
                 "code": code,
                 "message": message,
-                "requestId": getattr(request.state, "request_id", None),
                 "details": details or [],
+                "request_id": getattr(request.state, "request_id", None),
             }
         },
     )
@@ -89,7 +90,7 @@ async def _validation_error(request: Request, exc: RequestValidationError) -> JS
         {"field": ".".join(str(p) for p in err["loc"]), "message": err["msg"]}
         for err in exc.errors()
     ]
-    return error_response(request, 422, "VALIDATION_ERROR", "Request validation failed", details)
+    return error_response(request, 400, "VALIDATION_ERROR", "Request validation failed", details)
 
 
 async def _http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:

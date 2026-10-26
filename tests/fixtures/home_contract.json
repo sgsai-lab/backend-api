@@ -1,0 +1,237 @@
+{
+  "recorded_from": "sgsai-lab/home in-memory API",
+  "viewer_role": "admin",
+  "collections": {
+    "users": [
+      {
+        "id": "usr_7b41b949-9ab0-4801-a00c-b003cc1218d0",
+        "email": "admin@sgs.test",
+        "full_name": "admin",
+        "avatar_url": null,
+        "role": "admin",
+        "status": "active",
+        "provider": "password",
+        "provider_id": null,
+        "email_verified": true,
+        "created_at": "2026-10-26T21:47:02.795Z",
+        "last_login_at": "2026-10-26T21:47:02.899Z",
+        "updated_at": "2026-10-26T21:47:02.900Z"
+      },
+      {
+        "id": "usr_5e4e9e55-8982-44ab-802c-a45606afb14f",
+        "email": "lead@riverside.example",
+        "full_name": "lead",
+        "avatar_url": null,
+        "role": "user",
+        "status": "active",
+        "provider": "password",
+        "provider_id": null,
+        "email_verified": true,
+        "created_at": "2026-10-26T21:47:02.902Z",
+        "last_login_at": "2026-10-26T21:47:02.989Z",
+        "updated_at": "2026-10-26T21:47:02.989Z"
+      }
+    ],
+    "clients": [
+      {
+        "id": "cli_edf01ccb-3801-488c-8131-ead782f5099f",
+        "name": "Riverside Academy",
+        "slug": "riverside-academy",
+        "primary_sector": "education",
+        "status": "active",
+        "contact": {
+          "email": "office@riverside.example"
+        },
+        "branding": {
+          "primary_color": "#3355ff"
+        },
+        "created_by": "usr_7b41b949-9ab0-4801-a00c-b003cc1218d0",
+        "created_at": "2026-10-26T21:47:02.991Z",
+        "updated_at": "2026-10-26T21:47:02.991Z"
+      }
+    ],
+    "memberships": [
+      {
+        "client_id": "cli_edf01ccb-3801-488c-8131-ead782f5099f",
+        "user_id": "usr_7b41b949-9ab0-4801-a00c-b003cc1218d0",
+        "role": "owner",
+        "status": "active",
+        "invited_by": null,
+        "joined_at": "2026-10-26T21:47:02.991Z"
+      },
+      {
+        "client_id": "cli_edf01ccb-3801-488c-8131-ead782f5099f",
+        "user_id": "usr_5e4e9e55-8982-44ab-802c-a45606afb14f",
+        "role": "admin",
+        "status": "active",
+        "invited_by": "usr_7b41b949-9ab0-4801-a00c-b003cc1218d0",
+        "joined_at": "2026-10-26T21:47:02.994Z"
+      }
+    ],
+    "projects": [
+      {
+        "id": "prj_0401c9e7-451d-4363-ac51-b7f5a495e7dc",
+        "client_id": "cli_edf01ccb-3801-488c-8131-ead782f5099f",
+        "name": "Learning portal",
+        "summary": "Year 9 PWA",
+        "sector": "education",
+        "status": "in_progress",
+        "tags": [
+          "lms",
+          "pilot"
+        ],
+        "start_date": "2026-09-01",
+        "end_date": "2027-07-15",
+        "sector_profile": {
+          "institution_type": "school",
+          "programme": "Year 9 science",
+          "academic_year": "2026/27"
+        },
+        "milestones": [
+          {
+            "title": "Needs analysis",
+            "due": null,
+            "done": false
+          },
+          {
+            "title": "Pilot cohort",
+            "due": null,
+            "done": false
+          },
+          {
+            "title": "Rollout",
+            "due": null,
+            "done": false
+          },
+          {
+            "title": "Term review",
+            "due": null,
+            "done": false
+          }
+        ],
+        "cover_asset_id": null,
+        "owner_user_id": "usr_5e4e9e55-8982-44ab-802c-a45606afb14f",
+        "version": 1,
+        "deleted_at": null,
+        "expires_at": null,
+        "created_by": "usr_5e4e9e55-8982-44ab-802c-a45606afb14f",
+        "created_at": "2026-10-26T21:47:02.996Z",
+        "updated_at": "2026-10-26T21:47:02.996Z"
+      }
+    ],
+    "products": [
+      {
+        "id": "prd_1192ba30-9a31-40d2-825a-7ff2ca5f987f",
+        "client_id": "cli_edf01ccb-3801-488c-8131-ead782f5099f",
+        "project_id": "prj_0401c9e7-451d-4363-ac51-b7f5a495e7dc",
+        "kind": "pwa",
+        "name": "Learning Portal",
+        "slug": "learning-portal",
+        "summary": "Courses and homework",
+        "launch_url": "https://learn.riverside.example/app",
+        "store_urls": {},
+        "icon_asset_id": null,
+        "public_icon_url": null,
+        "public_icon_object": null,
+        "status": "live",
+        "visibility": "client",
+        "order": 1,
+        "created_by": "usr_7b41b949-9ab0-4801-a00c-b003cc1218d0",
+        "created_at": "2026-10-26T21:47:02.999Z",
+        "updated_at": "2026-10-26T21:47:02.999Z"
+      }
+    ]
+  },
+  "responses": {
+    "client": {
+      "id": "cli_edf01ccb-3801-488c-8131-ead782f5099f",
+      "name": "Riverside Academy",
+      "slug": "riverside-academy",
+      "primary_sector": "education",
+      "status": "active",
+      "contact": {
+        "email": "office@riverside.example"
+      },
+      "branding": {
+        "primary_color": "#3355ff"
+      },
+      "created_at": "2026-10-26T21:47:02.991Z",
+      "updated_at": "2026-10-26T21:47:02.991Z",
+      "my_role": "admin",
+      "member_count": 2
+    },
+    "project": {
+      "id": "prj_0401c9e7-451d-4363-ac51-b7f5a495e7dc",
+      "client_id": "cli_edf01ccb-3801-488c-8131-ead782f5099f",
+      "name": "Learning portal",
+      "summary": "Year 9 PWA",
+      "sector": "education",
+      "status": "in_progress",
+      "tags": [
+        "lms",
+        "pilot"
+      ],
+      "start_date": "2026-09-01",
+      "end_date": "2027-07-15",
+      "sector_profile": {
+        "institution_type": "school",
+        "programme": "Year 9 science",
+        "academic_year": "2026/27"
+      },
+      "milestones": [
+        {
+          "title": "Needs analysis",
+          "due": null,
+          "done": false
+        },
+        {
+          "title": "Pilot cohort",
+          "due": null,
+          "done": false
+        },
+        {
+          "title": "Rollout",
+          "due": null,
+          "done": false
+        },
+        {
+          "title": "Term review",
+          "due": null,
+          "done": false
+        }
+      ],
+      "cover_asset_id": null,
+      "owner_user_id": "usr_5e4e9e55-8982-44ab-802c-a45606afb14f",
+      "created_at": "2026-10-26T21:47:02.996Z",
+      "updated_at": "2026-10-26T21:47:02.996Z",
+      "deleted_at": null,
+      "can_edit": true
+    },
+    "products": {
+      "items": [
+        {
+          "id": "prd_1192ba30-9a31-40d2-825a-7ff2ca5f987f",
+          "client_id": "cli_edf01ccb-3801-488c-8131-ead782f5099f",
+          "project_id": "prj_0401c9e7-451d-4363-ac51-b7f5a495e7dc",
+          "kind": "pwa",
+          "name": "Learning Portal",
+          "slug": "learning-portal",
+          "summary": "Courses and homework",
+          "launch_url": "https://learn.riverside.example/app",
+          "store_urls": {},
+          "icon_asset_id": null,
+          "public_icon_url": null,
+          "status": "live",
+          "visibility": "client",
+          "order": 1,
+          "created_at": "2026-10-26T21:47:02.999Z",
+          "updated_at": "2026-10-26T21:47:02.999Z",
+          "can_edit": true
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "page_size": 20
+    }
+  }
+}
