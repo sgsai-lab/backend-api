@@ -6,6 +6,8 @@ Instructions for AI coding agents (GitHub Copilot, Claude Code, Cursor, Codex). 
 
 SGS AI backend API. Python 3.12 · FastAPI · SQLAlchemy 2 (async, asyncpg) · Alembic · PostgreSQL 16 · structlog · Docker · Cloud Run (GCP). Package manager: **uv** (never pip/poetry). Work is tracked in GitHub issues `API-xx`; the 2-week plan is pinned issue #19. Auth design: issue #7 (ADR-001 — backend-owned auth, not Firebase).
 
+**Current status (ADR-002, [docs/adr/0002-firestore-first-alignment.md](docs/adr/0002-firestore-first-alignment.md)):** `sgsai-lab/home` owns `/api/v1` on Firestore; API-07…16 are paused. Any resumed work must match `home`'s contract (client-scoped resources, same paths, fields and error envelope). The Postgres path is the spike in `app/modules/hub/` ([ADR-003](docs/adr/0003-postgres-migration-plan.md)); its routes mount only in `local`/`test`.
+
 ## Commands
 
 ```bash
@@ -28,6 +30,9 @@ app/api/         health routes, /api/v1 router aggregating modules
 app/modules/<m>/ router.py · schemas.py · service.py · models.py · deps.py
 migrations/      Alembic (async env); import new models in migrations/env.py
 tests/unit/      no DB;  tests/integration/  real Postgres, marked `integration`
+tests/fixtures/  home_contract.json (recorded by scripts/record_home_contract.mjs)
+scripts/         migrate_firestore.py (Firestore export → Postgres), contract recorder
+docs/adr/        decisions (ADR-002 alignment, ADR-003 migration plan)
 ```
 
 ## Non-negotiable rules

@@ -48,7 +48,7 @@ tests/         unit/ and integration/
 ## Conventions
 
 - All business routes are versioned under `/api/v1`.
-- Errors use one envelope: `{"error": {"code", "message", "requestId", "details"}}`.
+- Errors use one envelope: `{"error": {"code", "message", "details", "request_id"}}`, identical to `home` (ADR-002); validation errors are `400 VALIDATION_ERROR`.
 - Logs are structured JSON on stdout with Cloud Logging `severity`; never log secrets, tokens, passwords or OTPs.
 - Migrations follow expand → migrate → contract and must be backwards compatible with the deployed version.
 - Conventional commits; PRs need green CI.

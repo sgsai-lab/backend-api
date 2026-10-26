@@ -12,6 +12,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import request_context_middleware
 from app.db.session import get_engine
+from app.modules.hub.router import router as hub_spike_router
 
 log = structlog.get_logger(__name__)
 
@@ -52,6 +53,9 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(api_router)
+    if settings.environment in ("local", "test"):
+        # API-19 spike: header-based identity, so never mounted in deployed environments.
+        app.include_router(hub_spike_router, prefix="/api/v1")
     return app
 
 

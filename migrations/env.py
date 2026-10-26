@@ -9,6 +9,7 @@ from app.db.base import Base
 
 # Import every module's models here so autogenerate can see them, e.g.:
 # from app.modules.users import models as _users
+from app.modules.hub import models as _hub  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
